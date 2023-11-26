@@ -1,5 +1,5 @@
 import logging
-from aiogram import executor
+from aiogram  import executor
 from create_bot import dp
 from handlers.register import register_handlers
 
