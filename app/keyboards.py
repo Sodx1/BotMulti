@@ -14,8 +14,8 @@ button_anime = InlineKeyboardButton(text='Отправь "Няшку"',
 button_cancel = InlineKeyboardButton(text='Отмена',
                                      callback_data='Back')
 
-(multi_kb.add(button_weather).add(button_currency)
- .add(button_anime))
+(multi_kb.add(button_weather)
+)
 multi_kb.add(button_cancel)
 
 
