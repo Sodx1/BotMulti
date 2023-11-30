@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-API_KEY = os.getenv('CURRENCY_CONVERSION_API')
+API_KEY = os.getenv('CURRENCY_API')
 
 
 async def get_conversion(data: dict):

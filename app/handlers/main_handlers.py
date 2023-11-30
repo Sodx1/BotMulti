@@ -4,9 +4,7 @@ from aiogram import types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.state import State, StatesGroup
 
-
-from create_bot import bot
-from api import anime_api, currency_api, weather_api
+from api import currency_api, weather_api
 from keyboards import else_or_cancel_kb, menu_keyboard, multi_kb
 
 class States(StatesGroup):
@@ -86,6 +84,61 @@ async def weather(message: types.Message, state: FSMContext):
         await message.reply('К сожалению, такой город не найден :(',
                             reply_markup=else_or_cancel_kb)
         await States.else_or_cancel.set()
+
+
+async def currency_conversion(message: types.Message, state: FSMContext):
+    """
+    Обработчик конвертации валют
+    """
+    
+    data ={}
+    text = message.text.split(':')
+    if len(text) !=3:
+        await message.reply('Данные введены в неверном формате.',
+                            reply_markup=else_or_cancel_kb)
+        await States.else_or_cancel.set()
+    else:
+        data.update({'from': text[0], 'to': text[1], 'amount': text[2]})
+        wait_message = await message.answer('Ожидание ответа сервера...')
+        conversion = await currency_api.get_conversion(data)
+        await wait_message.delete()
+        if conversion.get('error'):
+            if conversion['error'] == 'server_error':
+                await message.reply('К сожалению сервер не отвечает :(')
+                await state.finish()
+                return
+            elif conversion['error']['code'] == 401:
+                await message.reply(
+                    f'Введена некоректная валюта FROM ({text[0]}).',
+                    reply_markup=else_or_cancel_kb
+                )
+            elif conversion['error']['code'] == 402:
+                await message.reply(
+                    f'Введена некоректная валюта TO ({text[1]}).',
+                    reply_markup=else_or_cancel_kb
+                )
+            elif conversion['error']['code'] == 403:
+                await message.answer(
+                    f'Введено некоректное число AMOUNT ({text[2]}).',
+                    reply_markup=else_or_cancel_kb
+                )
+            await States.else_or_cancel.set()
+        elif conversion.get('success'):
+            result = conversion['result']
+            date = datetime.fromtimestamp(conversion['info']['timestamp'])
+            to_currency = data['to'].upper()
+            from_currency = data['from'].upper()
+            amount = data['amount']
+            conversion_message = (
+                f'Конвертация валюты прошла успешно!\n'
+                f'Валюты: {from_currency} -> {to_currency}\n'
+                f'Количество денег: {amount} {from_currency}\n'
+                f'Результат: {result:.2f} {to_currency}\n'
+                f'Дата конвертации: {date}'
+            )
+            await message.answer(conversion_message)
+            await state.finish()
+
 async def else_or_cancel(callback_query: types.CallbackQuery,
                          state: FSMContext):
     """
@@ -95,10 +148,15 @@ async def else_or_cancel(callback_query: types.CallbackQuery,
     async with state.proxy() as data:
         data['else_or_cancel'] = callback_query.data
     if data['else_or_cancel'] == 'Back':
+        await state.finish()
         if data['type_callback'] == 'Weather':
             await States.weather.set()
             await callback_query.message.answer('Введите название города еще '
                                                 'раз:')
+        elif data['type_callback'] == 'Wallet':
+            await States.currency_conversion.set()
+            await callback_query.message.answer('Введите данные для'
+                                                ' конвертации еще раз:')
 
     await callback_query.message.delete()
 
